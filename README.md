@@ -1,87 +1,89 @@
-# Pantheon
+# Pantheon: A Telegram-native multi-LLM roundtable for structured debate and neutral synthesis
 
-Pantheon is a Telegram group-chat bot for multi-LLM roundtable discussions.
-One human starts a topic in Telegram, and several LLM-backed Telegram bots speak
-in sequence. The current default setup uses four public participant bots:
+Pantheon lets a user start a short, structured multi-model discussion directly
+inside a Telegram group. GPT, DeepSeek, Doubao, and Gemini appear as independent
+Telegram bot participants, each with its own bot identity and provider adapter.
 
-| Participant | Provider adapter | Model |
+The user starts a discussion with `/discuss <topic>` or addresses a specific bot
+with `/discuss@chosen_bot <topic>`. The addressed bot's model speaks first, then
+the remaining models continue in ring order until the configured round is
+complete. After the discussion ends, a separate synthesis module generates a
+prompt-constrained neutral synthesis and reports token/cache statistics.
+
+"Neutral" is a prompt-level design goal: the synthesis module is instructed to
+act as a neutral recorder, but Pantheon does not prove that the output is
+absolutely objective or unbiased.
+
+## Features
+
+- Four independent LLM participants
+- Telegram-native interaction
+- Addressed-bot-first rotating speaker order
+- Concise debate prompting
+- Prompt-constrained neutral synthesis
+- Provider-specific compatibility handling
+- Token/caching statistics
+- Secure `.env`-based configuration
+
+## Model Lineup
+
+Public participants:
+
+| Participant | Model | Adapter |
 |---|---|---|
-| ChatGPT | OpenAI-compatible | `gpt-4o-mini` |
-| DeepSeek | OpenAI-compatible | `deepseek-chat` |
-| Doubao | OpenAI-compatible | `doubao-seed-2-0-mini-260428` |
-| Gemini | Google Gemini | `gemini-3.5-flash` |
+| GPT | `gpt-4o-mini` | OpenAI-compatible |
+| DeepSeek | `deepseek-chat` | OpenAI-compatible |
+| Doubao | `doubao-seed-2-0-mini-260428` | OpenAI-compatible |
+| Gemini | `gemini-3.5-flash` | Google Gemini |
 
-After a discussion ends, a background summarizer produces a final summary. In the
-current config, the summarizer uses the Google adapter with `gemini-3.1-flash-lite`.
+Internal synthesis module:
 
-Pantheon is meant for observing how different LLMs frame, challenge, and converge
-around a topic. It is not a fact-checking system and should not be treated as an
-automated decision maker.
-
-## Current Status
-
-Implemented in the current codebase:
-
-- Four Telegram bots can listen for `/discuss`; each LLM has its own bot token.
-- An addressed command such as `/discuss@your_gemini_bot <topic>` starts with the
-  addressed model.
-- An unaddressed `/discuss <topic>` defaults to the first configured model.
-- The discussion proceeds in ring order from the starting model until every
-  configured participant has had a turn in the round.
-- Termination supports a hard `max_rounds`, `/stop`, and optional all-participant
-  `check` consensus.
-- The app sends an automatic final summary and token statistics after the run.
-- A prompt-level neutral-recorder rule exists for the final summary.
-
-Not implemented yet:
-
-- Hot reload via `/reload`.
-- Persistent session storage.
-- Multiple scenes such as games or collaborative editing.
-- A formal verifier that proves the final summary is neutral.
+| Module | Model | Role |
+|---|---|---|
+| Gemini synthesis | `gemini-3.1-flash-lite` | Neutral final synthesis and discussion compression |
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    U["Human in Telegram group"] --> P["BotPool"]
-    P -->|"one polling app per LLM bot"| A["PantheonApp"]
-    A --> D["DiscussionScene"]
-    D --> R["Ring rotation from starting LLM"]
-    D --> C["ContextBuilder"]
-    C --> W["Topic + prior turns + summary + injections"]
-    D --> L["LLM adapters"]
-    L --> O["OpenAI-compatible adapter<br/>ChatGPT, DeepSeek, Doubao"]
-    L --> G["Google adapter<br/>Gemini"]
-    D --> S["Summarizer"]
-    S --> F["Final neutral summary"]
-    A --> T["Telegram messages + token stats"]
+    U["User in Telegram Group"] --> CMD["/discuss@chosen_bot &lt;topic&gt;"]
+    CMD --> ROUTE["Command routing"]
+    ROUTE --> START["Addressed model speaks first"]
+    START --> ORDER["Rotating speaker order"]
+
+    ORDER --> GPT["GPT<br/>gpt-4o-mini"]
+    ORDER --> DS["DeepSeek<br/>deepseek-chat"]
+    ORDER --> DB["Doubao<br/>doubao-seed-2-0-mini-260428"]
+    ORDER --> GM["Gemini<br/>gemini-3.5-flash"]
+
+    GPT --> RING["Ring continues from chosen start"]
+    DS --> RING
+    DB --> RING
+    GM --> RING
+
+    RING --> SYN["Neutral Summary Module<br/>gemini-3.1-flash-lite"]
+    SYN --> OUT["Final synthesis + token/cache statistics"]
 ```
 
-The YAML file at `config/pantheon.yaml` is the source of truth for participants,
-model names, provider endpoints, rotation order, summary settings, and termination
-limits. Secrets are referenced with `${ENV_VAR}` placeholders and loaded from
-environment variables or a local `.env` file.
+The graph is intentionally not fixed to GPT-first. The first speaker is selected
+by the addressed Telegram bot; the rest of the participants follow in cyclic
+order from that starting point.
 
-## Telegram Interaction
-
-Start a discussion:
+## Example Telegram Usage
 
 ```text
-/discuss Should we release this project as open source?
+/discuss@your_deepseek_bot Should an AI coding agent prioritize speed or reliability?
 ```
 
-Start with a specific bot:
-
-```text
-/discuss@your_deepseek_bot What are the risks of this plan?
-```
+This command starts the discussion with the model behind `your_deepseek_bot`.
+The other configured participants then speak in ring order.
 
 Operational commands are handled by the first configured bot:
 
 | Command | Effect |
 |---|---|
-| `/discuss <topic>` | Start a new discussion |
+| `/discuss <topic>` | Start a new discussion with the default first participant |
+| `/discuss@chosen_bot <topic>` | Start with the addressed participant |
 | `/stop` | End the current discussion |
 | `/pause` | Pause an active discussion |
 | `/resume` | Resume a paused discussion |
@@ -89,19 +91,24 @@ Operational commands are handled by the first configured bot:
 | `/inject <text>` | Add moderator context to the next speaker |
 | `/help` | Show command help |
 
-Each participant is instructed to prefix replies with one of:
+## Demo
 
-```text
-【立场: 支持】
-【立场: 反对】
-【立场: 中立】
-【立场: 质疑】
-【立场: check】
-```
+A redacted Telegram demo screenshot or GIF will be added before public release.
 
-When every required participant replies with `check` in the same round, the
-discussion can terminate as consensus. The default config also has `max_rounds: 2`,
-so short runs are intentionally bounded.
+## Implementation Highlights
+
+- The OpenAI-compatible adapter is shared by GPT, DeepSeek, and Doubao while
+  allowing each provider to use its own `base_url` and API key.
+- The adapter layer includes provider-specific token parameter handling, so model
+  families that expect different max-token fields can be handled without changing
+  the discussion orchestration.
+- Doubao requests disable thinking mode for short, cost-controlled participation.
+- Gemini 3.x calls use a model-specific generation configuration with low thinking
+  and explicit output caps for concise responses.
+- Telegram bot routing supports any participant as the discussion starter when
+  the command addresses that bot.
+- The application reports prompt tokens, cached prompt tokens, completion tokens,
+  and cache ratio at the end of a discussion.
 
 ## Installation
 
@@ -109,8 +116,8 @@ Requirements:
 
 - Python 3.11 or newer
 - Four Telegram bots created with BotFather
-- A Telegram group that contains all four bots
-- API keys for OpenAI, DeepSeek, Google AI Studio, and Doubao/Volcengine Ark
+- A Telegram group containing all participant bots
+- API keys for OpenAI, DeepSeek, Doubao/Volcengine Ark, and Google AI Studio
 
 Install locally:
 
@@ -122,13 +129,13 @@ pip install -e ".[dev]"
 
 ## Configuration
 
-Create a local environment file:
+Copy the safe template and fill in local values:
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in the local `.env` file with your own values:
+Required environment variables:
 
 ```bash
 OPENAI_API_KEY=
@@ -145,42 +152,9 @@ TELEGRAM_GROUP_CHAT_ID=
 TELEGRAM_GOD_USER_ID=
 ```
 
-Do not commit `.env`. The repository includes `.env.example` only as a safe template.
-
-The default public participants are configured in `config/pantheon.yaml`:
-
-```yaml
-llms:
-  - name: chatgpt
-    display_name: "ChatGPT"
-    adapter: openai
-    model: gpt-4o-mini
-
-  - name: deepseek
-    display_name: "DeepSeek"
-    adapter: openai
-    model: deepseek-chat
-
-  - name: doubao
-    display_name: "Doubao"
-    adapter: openai
-    model: doubao-seed-2-0-mini-260428
-
-  - name: gemini
-    display_name: "Gemini"
-    adapter: google
-    model: gemini-3.5-flash
-```
-
-The background summarizer is configured separately:
-
-```yaml
-summarizer:
-  adapter: google
-  model: gemini-3.1-flash-lite
-  api_key: ${GOOGLE_AI_API_KEY}
-  max_output_tokens: 600
-```
+Do not commit `.env`. The repository includes `.env.example` only as a safe
+template. Runtime configuration is stored in `config/pantheon.yaml`, where
+provider API keys and bot tokens are referenced through environment variables.
 
 ## Running
 
@@ -190,7 +164,7 @@ Start Pantheon:
 python -m pantheon
 ```
 
-Or use an explicit config and env path:
+Or provide explicit paths:
 
 ```bash
 pantheon --config config/pantheon.yaml --env .env
@@ -199,55 +173,44 @@ pantheon --config config/pantheon.yaml --env .env
 Then send a command in the configured Telegram group:
 
 ```text
-/discuss Compare SQLite and Postgres for a small Telegram bot.
+/discuss@your_gemini_bot Compare SQLite and Postgres for a small Telegram bot.
 ```
 
 ## Token And Cost Controls
 
-Pantheon includes several cost-control mechanisms:
+Pantheon is designed for short, bounded discussions rather than unbounded chat:
 
 - `max_rounds` limits how many full participant cycles can run.
-- Each participant has a per-turn `max_output_tokens` limit.
+- Each participant has a per-turn `max_output_tokens` cap.
 - The context builder keeps a sliding window of recent turns.
-- Older turns can be compressed by the background summarizer.
+- Older turns can be compressed by the synthesis module.
 - OpenAI-compatible providers may report cached prompt tokens when available.
-- The Google adapter has best-effort explicit cache support for Gemini cached content.
-- The final Telegram status message reports prompt tokens, cached tokens, completion
-  tokens, and cache ratio for the discussion.
+- The Google adapter has best-effort explicit cache support for Gemini cached
+  content.
+- The final status message reports prompt tokens, cached tokens, completion
+  tokens, and cache ratio.
 
-These controls reduce unnecessary context growth, but they do not eliminate API
-costs. Every live discussion can still call paid provider APIs.
+These controls reduce unnecessary context growth, but every live discussion can
+still call paid provider APIs.
 
-## Safety Notes
+## Limitations
 
-- Keep `.env` local. It contains API keys, Telegram bot tokens, and the group chat ID.
-- Do not paste real tokens into README files, screenshots, logs, issues, or support
-  messages.
-- `logs/`, caches, virtual environments, backup files, archives, and scratch text
-  files are excluded by `.gitignore`.
-- If a secret was ever committed to a Git history, rotate it. Removing it from the
-  working tree is not enough.
-
-## Known Limitations
-
-- Multi-model discussion is not fact checking. Models can share the same wrong
-  assumption or repeat unsupported claims.
-- The final summary cannot be theoretically guaranteed to be absolutely objective.
-- The current neutral summary rule is implemented as a prompt-level "neutral
-  recorder" instruction, not as a formal verifier or second-pass audit.
-- The default short run length is not suitable for complex, high-risk decisions.
-- API calls can produce provider costs.
-- Telegram polling and provider APIs can fail independently; production deployments
-  need process supervision and monitoring.
-- `check` consensus is a conversational signal, not a proof that the answer is true.
+- Multi-model agreement is not factual verification.
+- The synthesis module is constrained toward neutrality but cannot be formally
+  guaranteed unbiased.
+- Short default discussions are not sufficient for high-stakes decisions.
+- API usage incurs provider costs.
+- No retrieval/citation layer is implemented in v0.1.
+- Telegram polling and provider APIs can fail independently; production use needs
+  process supervision and monitoring.
 
 ## Development
 
 Run linting and tests:
 
 ```bash
-ruff check .
-pytest -q
+.venv/bin/ruff check .
+.venv/bin/pytest -q
 ```
 
 ## License
