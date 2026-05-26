@@ -1,0 +1,98 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pantheon"
+version = "0.1.0"
+description = "A theatre of LLMs. One human god, N AI performers, watched through Telegram."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Cao Yusong" }
+]
+keywords = ["llm", "multi-agent", "telegram", "chatbot", "ai-agents"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    # Telegram
+    "python-telegram-bot[rate-limiter]>=21.0,<22.0",
+    # LLM SDKs
+    "openai>=1.40.0,<2.0.0",                  # Covers ChatGPT/DeepSeek/Doubao via base_url
+    "google-genai>=0.3.0",                    # Gemini, new unified SDK
+    # Config & validation
+    "pydantic>=2.7.0,<3.0.0",
+    "pydantic-settings>=2.4.0,<3.0.0",
+    "pyyaml>=6.0,<7.0",
+    "python-dotenv>=1.0.0,<2.0.0",
+    # Observability
+    "structlog>=24.1.0,<25.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=0.23,<1.0",
+    "pytest-mock>=3.12,<4.0",
+    "ruff>=0.5.0,<1.0.0",
+    "mypy>=1.10,<2.0",
+]
+
+[project.scripts]
+pantheon = "pantheon.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/<your-username>/pantheon"
+Documentation = "https://github.com/<your-username>/pantheon/blob/main/README.md"
+Issues = "https://github.com/<your-username>/pantheon/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pantheon = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "ASYNC",
+    "RUF",
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "RUF001", # ambiguous unicode chars in strings — we handle Chinese punctuation
+    "RUF002", # same, for docstrings
+    "RUF003", # same, for comments
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+exclude = ["tests/"]

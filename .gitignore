@@ -1,0 +1,94 @@
+# Secrets
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+
+# Pantheon runtime data
+data/
+logs/
+*.log
+sessions/
+
+# Local scratch/debug artifacts
+*.bak
+*.bak*
+*.zip
+*.tar
+*.tar.gz
+*.tmp
+*.tmp.*
+*.temp
+*.temp.*
+*.local.txt
+tmp*.txt
+scratch*.txt
+pantheon_*_needed.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing
+.pytest_cache/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Documentation builds
+docs/_build/
+site/

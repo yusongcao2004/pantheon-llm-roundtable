@@ -1,0 +1,99 @@
+# =====================================================================
+# Pantheon — Main Configuration
+#
+# Edit this file to reshape the pantheon: add/remove LLMs, tune rotation,
+# adjust anti-sycophancy thresholds, change the summarizer, etc.
+# Environment variables are referenced with the ${VAR_NAME} syntax.
+# =====================================================================
+
+# --- Telegram --------------------------------------------------------
+telegram:
+  group_chat_id: ${TELEGRAM_GROUP_CHAT_ID}
+  # Restrict the /discuss command to one user. Leave null to allow anyone.
+  god_user_id: ${TELEGRAM_GOD_USER_ID}
+
+# --- LLMs ------------------------------------------------------------
+# Order in this list = default rotation order in discussions.
+# To add a new LLM that speaks OpenAI's wire protocol (Kimi, Qwen, etc.),
+# copy any "adapter: openai" block and adjust `model`, `base_url`, env vars.
+# To add a new protocol (Anthropic, AWS Bedrock), implement a new adapter
+# in src/pantheon/adapters/ and reference it here by name.
+llms:
+  - name: chatgpt
+    display_name: "ChatGPT"
+    adapter: openai
+    model: gpt-4o-mini
+    bot_token: ${TELEGRAM_BOT_TOKEN_CHATGPT}
+    api_key: ${OPENAI_API_KEY}
+    base_url: https://api.openai.com/v1
+    temperature: 0.7
+    max_output_tokens: 800
+
+  - name: deepseek
+    display_name: "DeepSeek"
+    adapter: openai
+    model: deepseek-chat
+    bot_token: ${TELEGRAM_BOT_TOKEN_DEEPSEEK}
+    api_key: ${DEEPSEEK_API_KEY}
+    base_url: https://api.deepseek.com
+    temperature: 0.7
+    max_output_tokens: 800
+
+  - name: doubao
+    display_name: "Doubao"
+    adapter: openai
+    model: doubao-seed-2-0-mini-260428
+    bot_token: ${TELEGRAM_BOT_TOKEN_DOUBAO}
+    api_key: ${DOUBAO_API_KEY}
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    temperature: 0.7
+    max_output_tokens: 800
+
+  - name: gemini
+    display_name: "Gemini"
+    adapter: google
+    model: gemini-3.5-flash
+    bot_token: ${TELEGRAM_BOT_TOKEN_GEMINI}
+    api_key: ${GOOGLE_AI_API_KEY}
+    temperature: 0.7
+    max_output_tokens: 800
+
+# --- Discussion scene ------------------------------------------------
+discussion:
+  # Termination conditions (any one triggers end-of-discussion)
+  max_rounds: 2                     # Hard ceiling: one round = all LLMs speak once
+  require_all_check: true            # Consensus = all LLMs reply with 【立场】check
+  # /stop is always honoured regardless of these flags
+
+  # Context window
+  window_size_turns: 6               # Keep last K turns in full; older summarised
+  summary_trigger_rounds: 2          # Start summarising after this many completed rounds
+  summary_max_tokens: 500            # Cap on summary length
+
+  # Anti-sycophancy (light, 3 layers)
+  anti_sycophancy:
+    enabled: true
+    convergence_window: 4            # Look at last N utterances
+    convergence_threshold: 3         # If ≥ N agreement signals, force opposition next
+    challenge_injection: true        # Layer 1: prepend challenge instruction
+    position_label_required: true    # Layer 3: enforce 【立场】 prefix
+
+# --- Summarizer ------------------------------------------------------
+summarizer:
+  adapter: google
+  model: gemini-3.1-flash-lite
+  api_key: ${GOOGLE_AI_API_KEY}
+  max_output_tokens: 600
+
+# --- Caching ---------------------------------------------------------
+caching:
+  # OpenAI-compatible providers cache automatically when prefix >= 1024 tokens.
+  # Google requires explicit CachedContent creation; Pantheon handles this.
+  enabled: true
+  gemini_cache_ttl_seconds: 1800     # 30 minutes; refreshes per summary update
+
+# --- Logging ---------------------------------------------------------
+logging:
+  level: INFO                        # DEBUG | INFO | WARNING | ERROR
+  json_format: false                 # Set true for structured logs in production
+  file_path: logs/pantheon.log       # null to disable file logging
