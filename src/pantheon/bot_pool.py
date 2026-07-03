@@ -199,7 +199,7 @@ class BotPool:
         command_text = message_text.split(maxsplit=1)[0]
 
         # An unaddressed /discuss defaults to the narrator bot only.
-        # Addressed commands such as /discuss@pantheon_deepseek_cao_bot
+        # Addressed commands such as /discuss@<bot_username>
         # are handled by the bot that receives them.
         if "@" not in command_text and starting_llm != self._default_listener_name:
             return
